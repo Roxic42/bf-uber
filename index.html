@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Uber... for my BF</title>
+    
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Leaflet.js for the map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+    <style>
+        /* Make the map take up the full screen height */
+        #map { height: 100vh; }
+        /* Custom pulsing animation for the driver icon */
+        .pulse {
+            border-radius: 50%;
+            animation: pulse-animation 2s infinite;
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, 1);
+        }
+        @keyframes pulse-animation {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+            }
+            70% {
+                transform: scale(1);
+                box-shadow: 0 0 0 20px rgba(239, 68, 68, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-100 font-sans">
+    
+    <!-- The Map Container -->
+    <div id="map" class="z-0"></div>
+
+    <!-- UI Panel -->
+    <div id="ui-panel" class="absolute top-0 left-0 right-0 p-4 z-10">
+        <div class="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-5 space-y-4">
+
+            <!-- Configuration View (initial setup) -->
+            <div id="config-view">
+                <h1 class="text-2xl font-bold text-center text-gray-800">BF-Uber Setup</h1>
+                <p class="text-sm text-gray-500 text-center mb-4">Just a few details to get this working for you two!</p>
+                <div>
+                    <label for="riderName" class="block text-sm font-medium text-gray-700">Her Name:</label>
+                    <input type="text" id="riderName" placeholder="e.g. Jessica" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="driverName" class="block text-sm font-medium text-gray-700">Your Name:</label>
+                    <input type="text" id="driverName" placeholder="e.g. Mike" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                    <label for="driverPhone" class="block text-sm font-medium text-gray-700">Your (Driver's) Phone Number:</label>
+                    <input type="text" id="driverPhone" placeholder="Include country code, e.g. 15551234567" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <button id="saveConfig" class="w-full mt-4 bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-300 ease-in-out">Save & Start</button>
+                <p id="config-error" class="text-red-500 text-sm text-center mt-2 hidden"></p>
+            </div>
+
+            <!-- Rider View -->
+            <div id="rider-view" class="hidden space-y-3">
+                 <h1 class="text-2xl font-bold text-center text-gray-800">Hey <span id="riderNameDisplay"></span>!</h1>
+                 <p id="rider-status-text" class="text-center text-gray-600 text-sm">Drag the pin to set your pickup location.</p>
+                 
+                 <div class="bg-gray-50 p-3 rounded-lg text-center">
+                    <p class="text-xs text-gray-500">Pickup Address</p>
+                    <p id="pickup-address" class="font-semibold text-gray-800 h-10 flex items-center justify-center">Finding address...</p>
+                 </div>
+
+                 <!-- Ride Actions: Summon, Schedule, etc. -->
+                 <div id="ride-actions" class="space-y-3">
+                    <button id="request-ride-btn" class="w-full bg-red-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-300 ease-in-out text-lg">
+                        Request a Ride
+                    </button>
+                    <!-- Options that appear after clicking "Request a Ride" -->
+                    <div id="request-options" class="hidden grid grid-cols-2 gap-3">
+                        <button id="summon-now-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-green-600">Summon Now</button>
+                        <button id="schedule-later-btn" class="w-full bg-blue-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-600">Schedule for Later</button>
+                    </div>
+                     <!-- Scheduler UI -->
+                    <div id="scheduler" class="hidden space-y-3 pt-2">
+                        <label for="schedule-time" class="block text-sm font-medium text-gray-700">Pickup time:</label>
+                        <input type="datetime-local" id="schedule-time" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500">
+                        <button id="confirm-schedule-btn" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700">Confirm Schedule</button>
+                    </div>
+                 </div>
+                 
+                 <!-- Status for an active or scheduled ride -->
+                 <div id="active-ride-status" class="hidden text-center space-y-3">
+                    <div id="scheduled-info" class="hidden p-3 bg-blue-50 rounded-lg">
+                        <p class="font-bold text-blue-800">Ride Scheduled!</p>
+                        <p id="scheduled-time-display" class="text-blue-700"></p>
+                        <p class="text-xs text-blue-600 mt-2">Keep this page open to send the notification automatically.</p>
+                    </div>
+                     <button id="cancel-ride-btn" class="w-full bg-gray-500 text-white font-bold py-2 px-4 rounded-lg hover:bg-gray-600 text-sm">
+                        Cancel Ride
+                    </button>
+                 </div>
+            </div>
+            
+            <!-- Driver View -->
+            <div id="driver-view" class="hidden space-y-3">
+                 <h1 class="text-2xl font-bold text-center text-gray-800">Hey <span id="driverNameDisplay"></span>!</h1>
+                 <p class="text-center text-gray-600">Your location is now being shared.</p>
+                 <div id="driver-status-text" class="text-center font-semibold text-indigo-600 p-3 bg-indigo-50 rounded-lg">Sharing Location...</div>
+                 <button id="arrived-btn" class="w-full bg-green-500 text-white font-bold py-3 px-4 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition duration-300 ease-in-out">I've Arrived!</button>
+            </div>
+
+        </div>
+    </div>
+    
+    <script type="module">
+        // Firebase Imports
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- PASTE YOUR FIREBASE CONFIG HERE ---
+        // Replace this object with the one from your Firebase project console
+        const firebaseConfig = {
+            apiKey: "AIzaSy...YOUR_API_KEY",
+            authDomain: "your-project-id.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project-id.appspot.com",
+            messagingSenderId: "1234567890",
+            appId: "1:1234567890:web:abcdef123456"
+        };
+        // -----------------------------------------
+
+        // --- GLOBAL VARIABLES & CONFIG ---
+        const ZAGREB_COORDS = [45.8150, 15.9819];
+        // Using a unique ID for your app's data in Firestore.
+        const appId = 'bf-uber-app-123'; 
+        
+        let db, auth, userId;
+        let map, riderMarker, driverMarker;
+        let rideDocRef;
+        let isDriverMode = false;
+        let scheduleCheckInterval = null;
+        
+        let config = { riderName: 'Her', driverName: 'You', driverPhone: '' };
+        
+        const configView = document.getElementById('config-view');
+        const riderView = document.getElementById('rider-view');
+        const driverView = document.getElementById('driver-view');
+
+        // --- INITIALIZATION ---
+        function main() {
+            try {
+                if (!firebaseConfig.apiKey || firebaseConfig.apiKey.includes("...")) {
+                    document.body.innerHTML = `<div class="p-4 text-red-500 bg-red-100 rounded-md">Error: Firebase configuration is missing or incomplete. Please paste your config from Firebase into the index.html file.</div>`;
+                    console.error("Firebase config is missing!");
+                    return;
+                }
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        // Using a simple path. For public apps, consider more complex paths for security.
+                        rideDocRef = doc(db, "rides", appId);
+                        
+                        const savedConfig = localStorage.getItem(`bfUberConfig_${appId}`);
+                        if (savedConfig) {
+                            config = JSON.parse(savedConfig);
+                            configView.classList.add('hidden');
+                            initializeAppUI();
+                        } else {
+                            configView.classList.remove('hidden');
+                            document.getElementById('saveConfig').addEventListener('click', saveConfigAndStart);
+                        }
+                    } else {
+                        await signInAnonymously(auth);
+                    }
+                });
+
+            } catch (error) {
+                console.error("Firebase initialization failed:", error);
+                document.body.innerHTML = `<div class="p-4 text-red-500">Error: Could not initialize the app. Check console for details.</div>`;
+            }
+        }
+        
+        function saveConfigAndStart() {
+            const errorEl = document.getElementById('config-error');
+            errorEl.classList.add('hidden'); // Hide previous errors
+
+            config.riderName = document.getElementById('riderName').value || 'Her';
+            config.driverName = document.getElementById('driverName').value || 'You';
+            config.driverPhone = document.getElementById('driverPhone').value;
+            
+            if (!config.driverPhone) {
+                errorEl.textContent = 'Please enter the driver\'s phone number.';
+                errorEl.classList.remove('hidden');
+                return;
+            }
+
+            localStorage.setItem(`bfUberConfig_${appId}`, JSON.stringify(config));
+            configView.classList.add('hidden');
+            initializeAppUI();
+        }
+
+        function initializeAppUI() {
+            const urlParams = new URLSearchParams(window.location.search);
+            isDriverMode = urlParams.get('mode') === 'driver';
+
+            document.getElementById('riderNameDisplay').textContent = config.riderName;
+            document.getElementById('driverNameDisplay').textContent = config.driverName;
+            
+            map = L.map('map').setView(ZAGREB_COORDS, 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            if (isDriverMode) {
+                setupDriverView();
+            } else {
+                setupRiderView();
+            }
+            listenToRideStatus();
+        }
+
+        function setupRiderView() {
+            riderView.classList.remove('hidden');
+            const riderIcon = L.divIcon({ html: '📍', className: 'text-4xl', iconSize: [30, 40], iconAnchor: [15, 40] });
+            riderMarker = L.marker(map.getCenter(), { icon: riderIcon, draggable: true }).addTo(map);
+            
+            navigator.geolocation.getCurrentPosition(pos => {
+                const userLatLng = [pos.coords.latitude, pos.coords.longitude];
+                map.setView(userLatLng, 15);
+                riderMarker.setLatLng(userLatLng);
+                updatePickupAddress(userLatLng);
+            });
+
+            riderMarker.on('dragend', () => updatePickupAddress(riderMarker.getLatLng()));
+            document.getElementById('request-ride-btn').addEventListener('click', () => {
+                document.getElementById('request-options').classList.remove('hidden');
+                document.getElementById('request-ride-btn').classList.add('hidden');
+            });
+            document.getElementById('summon-now-btn').addEventListener('click', () => summonDriver(riderMarker.getLatLng()));
+            document.getElementById('schedule-later-btn').addEventListener('click', () => {
+                document.getElementById('scheduler').classList.remove('hidden');
+                document.getElementById('request-options').classList.add('hidden');
+                const now = new Date();
+                now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+                document.getElementById('schedule-time').min = now.toISOString().slice(0,16);
+            });
+            document.getElementById('confirm-schedule-btn').addEventListener('click', scheduleRide);
+            document.getElementById('cancel-ride-btn').addEventListener('click', resetRide);
+            updatePickupAddress(riderMarker.getLatLng());
+        }
+        
+        async function updatePickupAddress(latlngArr) {
+            const addressEl = document.getElementById('pickup-address');
+            addressEl.textContent = 'Finding address...';
+            const latlng = Array.isArray(latlngArr) ? { lat: latlngArr[0], lng: latlngArr[1] } : latlngArr;
+            try {
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latlng.lat}&lon=${latlng.lng}`);
+                const data = await response.json();
+                addressEl.textContent = data.display_name.split(',').slice(0, 3).join(',');
+            } catch (e) { addressEl.textContent = 'Could not find address'; }
+        }
+
+        async function summonDriver(pickupLatLng) {
+            const pickup = { lat: pickupLatLng.lat, lng: pickupLatLng.lng };
+            const wazeLink = `https://waze.com/ul?ll=${pickup.lat},${pickup.lng}&navigate=yes`;
+            const driverAppLink = `${window.location.href.split('?')[0]}?mode=driver`;
+            const message = encodeURIComponent(
+                `Hey ${config.driverName}! I need a ride! 🚗\n\n` +
+                `📍 Pickup Location: Tap to navigate with Waze:\n${wazeLink}\n\n` +
+                `-------\n` +
+                `🔴 IMPORTANT: Open this link to start sharing your location with me:\n${driverAppLink}`
+            );
+            const whatsappUrl = `https://wa.me/${config.driverPhone}?text=${message}`;
+            await setDoc(rideDocRef, {
+                status: 'requested', pickupLocation: pickup, driverLocation: null,
+                riderName: config.riderName, driverName: config.driverName, scheduledTime: null
+            });
+            window.open(whatsappUrl, '_blank');
+        }
+
+        async function scheduleRide() {
+            const scheduledTimeValue = document.getElementById('schedule-time').value;
+            const errorEl = document.querySelector('#scheduler p.text-red-500') || document.createElement('p');
+            errorEl.className = 'text-red-500 text-sm text-center';
+            if (!document.querySelector('#scheduler p.text-red-500')) {
+                document.getElementById('scheduler').appendChild(errorEl);
+            }
+            
+            if (!scheduledTimeValue) {
+                errorEl.textContent = 'Please select a time.';
+                return;
+            }
+            const scheduledTime = new Date(scheduledTimeValue);
+            if (scheduledTime < new Date()) {
+                errorEl.textContent = 'Please select a time in the future.';
+                return;
+            }
+            errorEl.textContent = ''; // Clear error
+            const pickupLatLng = riderMarker.getLatLng();
+            const pickup = { lat: pickupLatLng.lat, lng: pickupLatLng.lng };
+            await setDoc(rideDocRef, {
+                status: 'scheduled', pickupLocation: pickup, driverLocation: null,
+                riderName: config.riderName, driverName: config.driverName, scheduledTime: scheduledTime.toISOString()
+            });
+        }
+        
+        function setupDriverView() {
+            driverView.classList.remove('hidden');
+            document.getElementById('arrived-btn').addEventListener('click', markAsArrived);
+            navigator.geolocation.watchPosition(async (position) => {
+                const driverLatLng = { lat: position.coords.latitude, lng: position.coords.longitude };
+                await updateDoc(rideDocRef, { driverLocation: driverLatLng, status: 'enroute' });
+            }, (error) => {
+                console.error("Geolocation error:", error);
+                document.getElementById('driver-status-text').textContent = 'Location permissions denied.';
+            }, { enableHighAccuracy: true, maximumAge: 0 });
+        }
+
+        async function markAsArrived() { await updateDoc(rideDocRef, { status: 'arrived' }); }
+        
+        async function resetRide() {
+             await setDoc(rideDocRef, { status: 'idle', pickupLocation: null, driverLocation: null, scheduledTime: null });
+             window.location.href = window.location.href.split('?')[0]; // Reload
+        }
+
+        function listenToRideStatus() {
+            onSnapshot(rideDocRef, (doc) => {
+                const rideData = doc.data();
+                if (!rideData) return;
+                updateUIFromRideData(rideData);
+                if (rideData.driverLocation && !isDriverMode) {
+                    const driverLatLng = [rideData.driverLocation.lat, rideData.driverLocation.lng];
+                    if (!driverMarker) {
+                         const driverIcon = L.divIcon({
+                            html: `<div class="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center text-white text-lg font-bold shadow-lg pulse">🚗</div>`,
+                            className: '', iconSize: [32, 32], iconAnchor: [16, 16]
+                        });
+                        driverMarker = L.marker(driverLatLng, {icon: driverIcon}).addTo(map);
+                    } else { driverMarker.setLatLng(driverLatLng); }
+                    if(rideData.status === 'enroute') {
+                        const bounds = L.latLngBounds([riderMarker.getLatLng(), driverMarker.getLatLng()]);
+                        map.fitBounds(bounds.pad(0.3));
+                    }
+                }
+            });
+        }
+        
+        function updateUIFromRideData(rideData) {
+            const { status, scheduledTime, pickupLocation } = rideData;
+            if (scheduleCheckInterval) { clearInterval(scheduleCheckInterval); scheduleCheckInterval = null; }
+            document.getElementById('ride-actions').classList.add('hidden');
+            document.getElementById('active-ride-status').classList.add('hidden');
+            document.getElementById('scheduled-info').classList.add('hidden');
+            riderMarker.dragging.enable();
+
+            switch (status) {
+                case 'scheduled':
+                    document.getElementById('active-ride-status').classList.remove('hidden');
+                    document.getElementById('scheduled-info').classList.remove('hidden');
+                    document.getElementById('rider-status-text').textContent = `Your ride is scheduled. Waiting...`;
+                    riderMarker.dragging.disable();
+                    const time = new Date(scheduledTime);
+                    document.getElementById('scheduled-time-display').textContent = time.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+                    if (!isDriverMode) {
+                        scheduleCheckInterval = setInterval(() => {
+                            if (new Date() >= time) {
+                                clearInterval(scheduleCheckInterval);
+                                summonDriver(pickupLocation);
+                            }
+                        }, 1000);
+                    }
+                    break;
+                case 'requested':
+                    document.getElementById('active-ride-status').classList.remove('hidden');
+                    document.getElementById('rider-status-text').textContent = `Waiting for ${config.driverName} to start driving...`;
+                    riderMarker.dragging.disable();
+                    break;
+                case 'enroute':
+                    document.getElementById('active-ride-status').classList.remove('hidden');
+                    document.getElementById('rider-status-text').textContent = `${config.driverName} is on the way!`;
+                    riderMarker.dragging.disable();
+                    if (isDriverMode) { document.getElementById('driver-status-text').textContent = `You are on your way to ${rideData.riderName || 'her'}!`; }
+                    break;
+                case 'arrived':
+                    document.getElementById('active-ride-status').classList.remove('hidden');
+                    document.getElementById('rider-status-text').textContent = `${config.driverName} has arrived! 🎉`;
+                    riderMarker.dragging.disable();
+                    if (driverMarker) driverMarker.getElement().querySelector('div').classList.remove('pulse');
+                    if (isDriverMode) {
+                       document.getElementById('driver-status-text').textContent = `You've arrived! Great job!`;
+                       document.getElementById('arrived-btn').disabled = true;
+                       document.getElementById('arrived-btn').textContent = 'Arrived!';
+                    }
+                    break;
+                case 'idle':
+                default:
+                    document.getElementById('ride-actions').classList.remove('hidden');
+                    document.getElementById('rider-status-text').textContent = 'Drag the pin to set your pickup location.';
+                    document.getElementById('request-ride-btn').classList.remove('hidden');
+                    document.getElementById('request-options').classList.add('hidden');
+                    document.getElementById('scheduler').classList.add('hidden');
+                    if(driverMarker) map.removeLayer(driverMarker);
+                    driverMarker = null;
+            }
+        }
+        main();
+    </script>
+</body>
+</html>
+
