@@ -45,29 +45,8 @@
     <!-- UI Panel -->
     <div id="ui-panel" class="absolute top-0 left-0 right-0 p-4 z-10">
         <div class="max-w-md mx-auto bg-white rounded-2xl shadow-lg p-5 space-y-4">
-
-            <!-- Configuration View (initial setup for rider) -->
-            <div id="config-view">
-                <h1 class="text-2xl font-bold text-center text-gray-800">BF-Uber Setup</h1>
-                <p class="text-sm text-gray-500 text-center mb-4">Just a few details to get this working for you!</p>
-                <div>
-                    <label for="riderName" class="block text-sm font-medium text-gray-700">Your Name:</label>
-                    <input type="text" id="riderName" placeholder="e.g. Ana" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm">
-                </div>
-                <div>
-                    <label for="driverName" class="block text-sm font-medium text-gray-700">His Name:</label>
-                    <input type="text" id="driverName" placeholder="e.g. Marko" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm">
-                </div>
-                <div>
-                    <label for="driverPhone" class="block text-sm font-medium text-gray-700">His Phone Number (for WhatsApp):</label>
-                     <div class="flex items-center mt-1">
-                        <span class="inline-block bg-gray-200 px-3 py-2 border border-r-0 border-gray-300 rounded-l-md text-gray-600">+385</span>
-                        <input type="tel" id="driverPhone" placeholder="91234567" class="block w-full px-3 py-2 border border-gray-300 rounded-r-md shadow-sm">
-                    </div>
-                </div>
-                <button id="saveConfig" class="w-full mt-4 bg-indigo-600 text-white font-bold py-3 px-4 rounded-lg hover:bg-indigo-700 transition duration-300">Save & Start</button>
-                <p id="config-error" class="text-red-500 text-sm text-center mt-2 hidden"></p>
-            </div>
+            <!-- This setup view is now obsolete and will not be shown -->
+            <div id="config-view" class="hidden"></div>
 
             <!-- Rider View -->
             <div id="rider-view" class="hidden space-y-3">
@@ -115,7 +94,7 @@
         import { getFirestore, doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyAsJHiE0iwgXSbI2SjfglM7I-DXXNq9KXwY",
+            apiKey: "AIzaSyA5jHieD1wgKSbI2SjfglM7I-DXNq9KXwY",
             authDomain: "bf-uber-16ffa.firebaseapp.com",
             projectId: "bf-uber-16ffa",
             storageBucket: "bf-uber-16ffa.appspot.com",
@@ -124,16 +103,22 @@
             measurementId: "G-2YK3CX1B31"
         };
         
+        // --- ⬇️ YOUR INFO IS SET ⬇️ ---
+        const config = {
+            riderName: "Luce",
+            driverName: "Roko",
+            driverPhone: "385955073092" 
+        };
+        // --- ⬆️ NO NEED TO EDIT BELOW THIS LINE ⬆️ ---
+
         const ZAGREB_COORDS = [45.8150, 15.9819];
         const appId = 'bf-uber-app-123'; 
         
         let db, auth, userId, map, riderMarker, driverMarker, rideDocRef;
         let isDriverMode = false;
         let scheduleCheckInterval = null;
-        let config = {};
         
         const ui = {
-            configView: document.getElementById('config-view'),
             riderView: document.getElementById('rider-view'),
             driverView: document.getElementById('driver-view'),
         };
@@ -162,52 +147,6 @@
         function handleAppLoad() {
             const urlParams = new URLSearchParams(window.location.search);
             isDriverMode = urlParams.get('mode') === 'driver';
-
-            const savedConfig = localStorage.getItem(`bfUberConfig_${appId}`);
-            if (savedConfig) {
-                config = JSON.parse(savedConfig);
-            }
-
-            if (isDriverMode) {
-                if (!config.driverName) {
-                    // This can happen if the driver clears cache. Prompt for name.
-                    const driverName = prompt("Please enter your name:", "Driver");
-                    config.driverName = driverName || 'Driver';
-                }
-                initializeAppUI();
-            } else {
-                if (savedConfig) {
-                    initializeAppUI();
-                } else {
-                    ui.configView.classList.remove('hidden');
-                    document.getElementById('saveConfig').addEventListener('click', saveConfigAndStart);
-                }
-            }
-        }
-        
-        function normalizePhoneNumber(phone) {
-            return `385${phone.replace(/^0+/, '').replace(/\s+/g, '')}`;
-        }
-        
-        function saveConfigAndStart() {
-            const errorEl = document.getElementById('config-error');
-            errorEl.classList.add('hidden');
-
-            const newConfig = {
-                riderName: document.getElementById('riderName').value,
-                driverName: document.getElementById('driverName').value,
-                driverPhone: normalizePhoneNumber(document.getElementById('driverPhone').value)
-            };
-            
-            if (!newConfig.riderName || !newConfig.driverName || !newConfig.driverPhone) {
-                errorEl.textContent = 'Please fill in all fields.';
-                errorEl.classList.remove('hidden');
-                return;
-            }
-            config = newConfig;
-            localStorage.setItem(`bfUberConfig_${appId}`, JSON.stringify(config));
-            
-            ui.configView.classList.add('hidden');
             initializeAppUI();
         }
         
@@ -221,12 +160,8 @@
             }).addTo(map);
 
             if (isDriverMode) {
-                ui.configView.classList.add('hidden');
-                ui.riderView.classList.add('hidden');
                 setupDriverView();
             } else {
-                ui.configView.classList.add('hidden');
-                ui.driverView.classList.add('hidden');
                 setupRiderView();
             }
             listenToRideStatus();
@@ -417,4 +352,6 @@
     </script>
 </body>
 </html>
+
+
 
