@@ -120,31 +120,20 @@
     
     <script type="module">
         // Firebase Imports
-  // Import the functions you need from the SDKs you need
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
-      import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-analytics.js";
-  // TODO: Add SDKs for Firebase products that you want to use
-  // https://firebase.google.com/docs/web/setup#available-libraries
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-  // Your web app's Firebase configuration
-  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-      const firebaseConfig = {
-        apiKey: "AIzaSyA5jHieD1wgKSb12sjFgLm7I-DXNq9KXwY",
-        authDomain: "bf-uber-16ffa.firebaseapp.com",
-        projectId: "bf-uber-16ffa",
-        storageBucket: "bf-uber-16ffa.firebasestorage.app",
-        messagingSenderId: "545966168464",
-        appId: "1:545966168464:web:76fa8ebe801c47f9ca7b15",
-        measurementId: "G-2YK3CX1B31"
-  };
-
-  // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
-</script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAsJHiE0iwgXSbI2SjfglM7I-DXXNq9KXwY",
+            authDomain: "bf-uber-16ffa.firebaseapp.com",
+            projectId: "bf-uber-16ffa",
+            storageBucket: "bf-uber-16ffa.appspot.com",
+            messagingSenderId: "545966168464",
+            appId: "1:545966168464:web:76fa8e801c47f9ca7b15",
+            measurementId: "G-2YK3CX1B31"
+        };
         
-        // -----------------------------------------
-
         // --- GLOBAL VARIABLES & CONFIG ---
         const ZAGREB_COORDS = [45.8150, 15.9819];
         // Using a unique ID for your app's data in Firestore.
@@ -371,14 +360,14 @@
             document.getElementById('ride-actions').classList.add('hidden');
             document.getElementById('active-ride-status').classList.add('hidden');
             document.getElementById('scheduled-info').classList.add('hidden');
-            riderMarker.dragging.enable();
+            if (riderMarker) riderMarker.dragging.enable();
 
             switch (status) {
                 case 'scheduled':
                     document.getElementById('active-ride-status').classList.remove('hidden');
                     document.getElementById('scheduled-info').classList.remove('hidden');
                     document.getElementById('rider-status-text').textContent = `Your ride is scheduled. Waiting...`;
-                    riderMarker.dragging.disable();
+                    if (riderMarker) riderMarker.dragging.disable();
                     const time = new Date(scheduledTime);
                     document.getElementById('scheduled-time-display').textContent = time.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
                     if (!isDriverMode) {
@@ -393,18 +382,18 @@
                 case 'requested':
                     document.getElementById('active-ride-status').classList.remove('hidden');
                     document.getElementById('rider-status-text').textContent = `Waiting for ${config.driverName} to start driving...`;
-                    riderMarker.dragging.disable();
+                    if (riderMarker) riderMarker.dragging.disable();
                     break;
                 case 'enroute':
                     document.getElementById('active-ride-status').classList.remove('hidden');
                     document.getElementById('rider-status-text').textContent = `${config.driverName} is on the way!`;
-                    riderMarker.dragging.disable();
+                    if (riderMarker) riderMarker.dragging.disable();
                     if (isDriverMode) { document.getElementById('driver-status-text').textContent = `You are on your way to ${rideData.riderName || 'her'}!`; }
                     break;
                 case 'arrived':
                     document.getElementById('active-ride-status').classList.remove('hidden');
                     document.getElementById('rider-status-text').textContent = `${config.driverName} has arrived! 🎉`;
-                    riderMarker.dragging.disable();
+                    if (riderMarker) riderMarker.dragging.disable();
                     if (driverMarker) driverMarker.getElement().querySelector('div').classList.remove('pulse');
                     if (isDriverMode) {
                        document.getElementById('driver-status-text').textContent = `You've arrived! Great job!`;
@@ -419,13 +408,14 @@
                     document.getElementById('request-ride-btn').classList.remove('hidden');
                     document.getElementById('request-options').classList.add('hidden');
                     document.getElementById('scheduler').classList.add('hidden');
-                    if(driverMarker) map.removeLayer(driverMarker);
-                    driverMarker = null;
+                    if(driverMarker) {
+                        map.removeLayer(driverMarker);
+                        driverMarker = null;
+                    }
             }
         }
         main();
     </script>
 </body>
 </html>
-
 
